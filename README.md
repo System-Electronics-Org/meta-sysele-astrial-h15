@@ -294,7 +294,7 @@ there, and a third for later updates. Pick one now and prepare it with the board
 |---|---|---|
 | **TFTP** | an Ethernet cable and a TFTP server on your host | eMMC or microSD, blank or not |
 | **SD card** | a card reader on your host | microSD |
-| SWU | a board that already runs Linux | updates. Not reachable from the boot menu on this board |
+| SWU | a board that already runs Linux | updates, not a first installation |
 
 TFTP is the one to prefer if you have the cable: it needs no card reader, it writes to a blank eMMC,
 and it puts the image where the board boots from in production.
@@ -318,10 +318,13 @@ sync
 Replace `/dev/sdX` with your card reader's device, and check it twice: `dd` writes wherever you point
 it. Then insert the card in the carrier.
 
-**SWU** is not a route for a first installation here. The release does ship a `.swu`, but SWUpdate
-is not enabled in this board's U-Boot, so there is no SWUpdate entry in the boot menu: the file is
-meant to be applied from a running Linux system. We have not exercised that path on Astrial, so for
-now treat it as an update mechanism to be documented, not as a way to program a blank board.
+**SWU** updates a board that already runs; it is not a route for a first installation. The release
+ships a `.swu`, SWUpdate is enabled in this board's U-Boot, and the boot menu has an SWUpdate entry.
+
+What it cannot do yet is run unattended. Two things are missing and are being fixed: the Autodetect
+entry does not check `boot_image_mode`, so a board told to update over the air comes back up in
+normal Linux instead, and the default filesystem device for this machine is still the SD card rather
+than the eMMC. Until both land, drive an update from the boot menu with a console attached.
 
 ### Step 6: Power On and Install
 

@@ -13,16 +13,20 @@
 #define BOOTMENU \
     /* Try all boot options by order */ \
     "bootmenu_0=Autodetect=" \
+        /* Lo SCU segnala con boot_image_mode che e' stato chiesto un aggiornamento \
+         * remoto: senza questo controllo la scheda riparte in Linux e l'OTA non \
+         * si avvia mai. Le altre configurazioni Hailo lo hanno. */ \
+        "if test ${boot_image_mode} = 1; then run boot_swupdate_mmc; exit 1; fi; " \
         "if test \"${auto_uboot_update_enable}\" = \"yes\"; then run auto_uboot_update; exit 1; fi; " \
         "echo Trying Boot from eMMC; run boot_mmc1;" \
         "echo Trying Boot from SD Card; run boot_mmc0;" \
         "echo Trying Boot from NFS; run bootnfs;" \
         "echo ERROR: All boot options failed\0" \
     "bootmenu_1=Boot from SD Card=run boot_mmc0\0" \
-    "bootmenu_2=Boot from eMMC=run boot_mmc1\0" \    
-    "bootmenu_3=Update eMMC (wic) from TFTP=run update_wic_mmc1 && bootmenu -1\0" \
-    "bootmenu_4=Update SDCARD (wic) from TFTP=run update_wic_mmc0 && bootmenu -1\0" \    
-    "bootmenu_5=Update SD (partitions) from TFTP=run update_partitions_mmc1 && bootmenu -1\0" \
+    "bootmenu_2=Boot from eMMC=run boot_mmc1\0" \
+    "bootmenu_3=Update eMMC (wic) from TFTP=run update_wic_mmc1 && bootmenu 30\0" \
+    "bootmenu_4=Update SDCARD (wic) from TFTP=run update_wic_mmc0 && bootmenu 30\0" \
+    "bootmenu_5=Update SD (partitions) from TFTP=run update_partitions_mmc1 && bootmenu 30\0" \
     "bootmenu_6=Boot from NFS=run bootnfs\0" \
     "default_spl_boot_source=nor\0" \
     "spl_boot_source=nor\0" \
@@ -30,8 +34,10 @@
     "board=astrial-h15\0"
 
 #ifdef CONFIG_HAILO15_SWUPDATE
-#define SWUPDATE_BOOTMENU_OPTION "bootmenu_5=SWUpdate=run boot_swupdate_mmc\0" \
-                                 "bootmenu_6=SWUpdate AB board init=run boot_swupdate_ab_tftp\0"
+/* 7 e 8, non 5 e 6: quelle le usa gia' BOOTMENU, e due voci con lo stesso indice si
+ * coprono a vicenda rendendo irraggiungibili "Update SD (partitions)" e "Boot from NFS". */
+#define SWUPDATE_BOOTMENU_OPTION "bootmenu_7=SWUpdate=run boot_swupdate_mmc\0" \
+                                 "bootmenu_8=SWUpdate AB board init=run boot_swupdate_ab_tftp\0"
 #endif /* CONFIG_HAILO15_SWUPDATE */
 
 #include "hailo15_common.h"
