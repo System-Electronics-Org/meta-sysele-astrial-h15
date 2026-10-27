@@ -30,6 +30,13 @@
     "bootmenu_6=Boot from NFS=run bootnfs\0" \
     "default_spl_boot_source=nor\0" \
     "spl_boot_source=nor\0" \
+    /* Modi di default dello SWU: solo la copia del rootfs. Il valore di Hailo e' \
+     * "init-partitions-single,init-scu-bl,copy-a", che rifa' la tabella delle \
+     * partizioni e riscrive il bootloader dello SCU: giusto per una prima \
+     * installazione, non per un aggiornamento sul campo, dove trasforma un update \
+     * interrotto in una scheda che non riparte. Per la prima installazione si passa \
+     * il valore completo esplicitamente. */ \
+    "swupdate_update_modes=copy-a\0" \
     "core_image_name=core-image-hailo-dev\0" \
     "board=astrial-h15\0"
 
