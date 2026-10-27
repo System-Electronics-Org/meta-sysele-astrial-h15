@@ -2,10 +2,11 @@
 # long-description: Creates a partitioned SD card image for Hailo.
 # Boot files are located in the first vfat partition.
 
-# --no-fstab-update: la riga di /boot nel fstab la mettiamo noi in base-files, per
-# etichetta. wic la aggiunge per UUID, ma solo nella wic: il rootfs grezzo dentro lo
-# .swu non passa da qui, e dopo un aggiornamento /boot resterebbe non montato. Con la
-# nostra riga le due consegne hanno lo stesso fstab; senza questa opzione ce ne sarebbero
-# due per lo stesso punto di mount, e la seconda sarebbe inerte.
-part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4 --fixed-size="${SD_FIXED_SIZE}M" --use-uuid --no-fstab-update
-part / --source rootfs --ondisk mmcblk --fstype=ext4 --label root --align 4 --use-uuid
+part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4 --fixed-size="${SD_FIXED_SIZE}M" --use-uuid
+
+# --no-fstab-update va sulla partizione di ROOT, non su quella di boot: significa "non
+# riscrivere il fstab dentro questa partizione". La riga di /boot la mettiamo noi in
+# base-files, per etichetta, perche' il rootfs grezzo dentro lo .swu non passa da wic e
+# senza di essa dopo un aggiornamento /boot resta non montato. Senza questa opzione wic
+# ne aggiunge una seconda per UUID e la wic ne avrebbe due per lo stesso punto di mount.
+part / --source rootfs --ondisk mmcblk --fstype=ext4 --label root --align 4 --use-uuid --no-fstab-update
