@@ -2,5 +2,10 @@
 # long-description: Creates a partitioned SD card image for Hailo.
 # Boot files are located in the first vfat partition.
 
-part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4 --fixed-size="${SD_FIXED_SIZE}M" --use-uuid
+# --no-fstab-update: la riga di /boot nel fstab la mettiamo noi in base-files, per
+# etichetta. wic la aggiunge per UUID, ma solo nella wic: il rootfs grezzo dentro lo
+# .swu non passa da qui, e dopo un aggiornamento /boot resterebbe non montato. Con la
+# nostra riga le due consegne hanno lo stesso fstab; senza questa opzione ce ne sarebbero
+# due per lo stesso punto di mount, e la seconda sarebbe inerte.
+part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4 --fixed-size="${SD_FIXED_SIZE}M" --use-uuid --no-fstab-update
 part / --source rootfs --ondisk mmcblk --fstype=ext4 --label root --align 4 --use-uuid
