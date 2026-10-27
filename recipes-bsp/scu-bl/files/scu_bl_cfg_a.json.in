@@ -1,0 +1,27 @@
+{
+    "boot_max_retries": "@BOOT_RETRIES@",
+    "image_descriptors": [
+        {
+            "boot_image_offset": "0x00000000",
+            "boot_image_source": "bootstrap",
+            "boot_image_mode": "normal"
+        },
+        {
+            "boot_image_offset": "@FALLBACK_OFFSET@",
+            "boot_image_source": "bootstrap",
+            "boot_image_mode": "normal"
+        },
+        {
+            "boot_image_offset": "0x00000000",
+            "boot_image_source": "bootstrap",
+            "boot_image_mode": "normal"
+        },
+        {
+            "boot_image_offset": "0x00000000",
+            "boot_image_source": "bootstrap",
+            "boot_image_mode": "normal"
+        }
+    ],
+    "last_valid_desc_index": 1,
+    "debug_logs_enabled": true
+}
