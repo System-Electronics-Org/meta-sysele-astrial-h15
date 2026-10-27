@@ -30,21 +30,30 @@
     "bootmenu_6=Boot from NFS=run bootnfs\0" \
     "default_spl_boot_source=nor\0" \
     "spl_boot_source=nor\0" \
-    /* Modi di default dello SWU: solo la copia del rootfs. Il valore di Hailo e' \
-     * "init-partitions-single,init-scu-bl,copy-a", che rifa' la tabella delle \
-     * partizioni e riscrive il bootloader dello SCU: giusto per una prima \
-     * installazione, non per un aggiornamento sul campo, dove trasforma un update \
-     * interrotto in una scheda che non riparte. Per la prima installazione si passa \
-     * il valore completo esplicitamente. */ \
-    "swupdate_update_modes=copy-a\0" \
     "core_image_name=core-image-hailo-dev\0" \
     "board=astrial-h15\0"
 
 #ifdef CONFIG_HAILO15_SWUPDATE
 /* 7 e 8, non 5 e 6: quelle le usa gia' BOOTMENU, e due voci con lo stesso indice si
- * coprono a vicenda rendendo irraggiungibili "Update SD (partitions)" e "Boot from NFS". */
+ * coprono a vicenda rendendo irraggiungibili "Update SD (partitions)" e "Boot from NFS".
+ *
+ * Qui dentro c'e' anche swupdate_update_modes, che con le voci di menu non c'entra. Il
+ * motivo e' l'ordine: CONFIG_EXTRA_ENV_SETTINGS di hailo1x_common.h finisce con
+ *   ... SWUPDATE_EXTRA_ENV_SETTINGS SWUPDATE_BOOTMENU_OPTION
+ * e il valore di Hailo (init-partitions-single,init-scu-bl,copy-a) sta dentro il primo.
+ * Nell'ambiente di U-Boot, a parita' di chiave vince l'ultima assegnazione, quindi una
+ * nostra riga messa insieme alle altre verrebbe sovrascritta: lo abbiamo verificato
+ * sull'u-boot-initial-env prodotto, dove comparivano entrambe e vinceva la loro.
+ * SWUPDATE_BOOTMENU_OPTION e' l'ultima macro espansa, ed e' nostra: e' l'unico punto da
+ * cui possiamo avere l'ultima parola senza duplicare mezzo header di Hailo.
+ *
+ * Perche' copy-a: init-partitions-single rifa' la tabella delle partizioni e
+ * init-scu-bl riscrive il bootloader dello SCU. Giusto per una prima installazione,
+ * sbagliato per un aggiornamento sul campo, dove trasforma un update interrotto in una
+ * scheda che non riparte. Per la prima installazione si passa il valore completo. */
 #define SWUPDATE_BOOTMENU_OPTION "bootmenu_7=SWUpdate=run boot_swupdate_mmc\0" \
-                                 "bootmenu_8=SWUpdate AB board init=run boot_swupdate_ab_tftp\0"
+                                 "bootmenu_8=SWUpdate AB board init=run boot_swupdate_ab_tftp\0" \
+                                 "swupdate_update_modes=copy-a\0"
 #endif /* CONFIG_HAILO15_SWUPDATE */
 
 #include "hailo15_common.h"
