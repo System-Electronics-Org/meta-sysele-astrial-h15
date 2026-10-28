@@ -180,22 +180,10 @@ cmd_recovery() {
         "$i" "$MENU_TAG" "$d" >> "$script"
     i=$((i + 1))
 
-    # One entry per overlay: it enables that one and clears the others, which is
-    # the behaviour wanted by somebody trying to get back to a booting board.
-    while IFS="$(printf '\t')" read -r t n c l; do
-        [ "$t" = "overlay" ] || continue
-        printf 'bootmenu_%s=%s %s=setenv dtb_overlays '"'"'%s'"'"'; saveenv; reset\n' \
-            "$i" "$MENU_TAG" "$l" "$c" >> "$script"
-        i=$((i + 1))
-    done < "$LIST"
-
-    while IFS="$(printf '\t')" read -r t n c l; do
-        case "$t" in base*) ;; *) continue ;; esac
-        [ "$n" = "$d" ] && continue
-        printf 'bootmenu_%s=%s %s=setenv board_dtb %s; setenv dtb_overlays '"'"' '"'"'; saveenv; reset\n' \
-            "$i" "$MENU_TAG" "$l" "$n" >> "$script"
-        i=$((i + 1))
-    done < "$LIST"
+    # Solo la voce di fabbrica. Una voce per overlay rendeva il menu lungo quanto
+    # l'elenco degli overlay, e cresceva a ogni overlay aggiunto. Gli overlay si
+    # scelgono da Linux con sysele-config, non dal bootmenu: qui serve solo la via
+    # di ritorno quando una scelta non arriva a Linux.
 
     # A previous install may have left more entries than this build needs.
     printf '%s\n' "$env_now" | sed -n 's/^bootmenu_\([0-9]*\)=.*/\1/p' |
@@ -213,7 +201,7 @@ cmd_recovery() {
 
     fw_setenv -s "$script" || { rm -f "$script"; die "fw_setenv failed to write the recovery entries"; }
     rm -f "$script"
-    echo "recovery entries installed: bootmenu_$first to bootmenu_$((i - 1))."
+    echo "recovery entry installed: bootmenu_$first."
     echo "Reach them from the serial console: stop the board and type bootmenu"
 }
 
