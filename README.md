@@ -294,7 +294,7 @@ there, and a third for later updates. Pick one now and prepare it with the board
 |---|---|---|
 | **TFTP** | an Ethernet cable and a TFTP server on your host | eMMC or microSD, blank or not |
 | **SD card** | a card reader on your host | microSD |
-| SWU | a board that already runs Linux | updates, not a first installation |
+| SWU | a board that already runs Linux | eMMC, as an update rather than a first installation |
 
 TFTP is the one to prefer if you have the cable: it needs no card reader, it writes to a blank eMMC,
 and it puts the image where the board boots from in production.
@@ -318,13 +318,24 @@ sync
 Replace `/dev/sdX` with your card reader's device, and check it twice: `dd` writes wherever you point
 it. Then insert the card in the carrier.
 
-**SWU** updates a board that already runs; it is not a route for a first installation. The release
-ships a `.swu`, SWUpdate is enabled in this board's U-Boot, and the boot menu has an SWUpdate entry.
+**SWU** updates a board that already runs Linux; it is not a route for a first installation. The
+release ships a `.swu`, SWUpdate is enabled in this board's U-Boot, and the update runs unattended,
+launched from the board itself:
 
-What it cannot do yet is run unattended. Two things are missing and are being fixed: the Autodetect
-entry does not check `boot_image_mode`, so a board told to update over the air comes back up in
-normal Linux instead, and the default filesystem device for this machine is still the SD card rather
-than the eMMC. Until both land, drive an update from the boot menu with a console attached.
+```bash
+/etc/run_swupdate.sh -b -s 10.0.0.2 -r hailo-update-image-astrial-h15.swu
+```
+
+The board records the request, reboots into `swupdate-image`, fetches the file from the TFTP server,
+writes it to the eMMC and comes back up on the new system. Nothing needs to be typed at the console
+while it runs. `swupdate-image` carries no sshd, so for the few minutes the transfer takes the board
+answers ping but refuses port 22: that is the update working, not a board that has gone.
+
+> **An update moves the boot source.** `spl_boot_source` goes from `nor` to `mmc21`, because the
+> `.swu` runs `update_fw_env.sh` and moves U-Boot from the SPI-NOR to the eMMC boot partition. It
+> happens on every update, not only on a first installation. Afterwards a corrupted eMMC leaves the
+> board with no bootloader, where before it would still have come up from the SPI-NOR, which an
+> update does not touch.
 
 ### Step 6: Power On and Install
 
