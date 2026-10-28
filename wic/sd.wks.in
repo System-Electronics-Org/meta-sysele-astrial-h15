@@ -4,9 +4,7 @@
 
 part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4 --fixed-size="${SD_FIXED_SIZE}M" --use-uuid
 
-# --no-fstab-update va sulla partizione di ROOT, non su quella di boot: significa "non
-# riscrivere il fstab dentro questa partizione". La riga di /boot la mettiamo noi in
-# base-files, per etichetta, perche' il rootfs grezzo dentro lo .swu non passa da wic e
-# senza di essa dopo un aggiornamento /boot resta non montato. Senza questa opzione wic
-# ne aggiunge una seconda per UUID e la wic ne avrebbe due per lo stesso punto di mount.
+# --no-fstab-update va sulla partizione di root: significa "non riscrivere il fstab qui".
+# La riga di /boot la mette base-files, per etichetta, perche' il rootfs dello .swu non
+# passa da wic. Senza questa opzione la wic ne avrebbe due per lo stesso mountpoint.
 part / --source rootfs --ondisk mmcblk --fstype=ext4 --label root --align 4 --use-uuid --no-fstab-update

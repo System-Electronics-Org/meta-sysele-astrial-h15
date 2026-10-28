@@ -13,9 +13,8 @@
 #define BOOTMENU \
     /* Try all boot options by order */ \
     "bootmenu_0=Autodetect=" \
-        /* Lo SCU segnala con boot_image_mode che e' stato chiesto un aggiornamento \
-         * remoto: senza questo controllo la scheda riparte in Linux e l'OTA non \
-         * si avvia mai. Le altre configurazioni Hailo lo hanno. */ \
+        /* boot_image_mode = 1 significa aggiornamento remoto richiesto dallo SCU.
+         * Senza questo la scheda riparte in Linux e l'OTA non si avvia. */ \
         "if test ${boot_image_mode} = 1; then run boot_swupdate_mmc; exit 1; fi; " \
         "if test \"${auto_uboot_update_enable}\" = \"yes\"; then run auto_uboot_update; exit 1; fi; " \
         "echo Trying Boot from eMMC; run boot_mmc1;" \
@@ -34,23 +33,14 @@
     "board=astrial-h15\0"
 
 #ifdef CONFIG_HAILO15_SWUPDATE
-/* 7 e 8, non 5 e 6: quelle le usa gia' BOOTMENU, e due voci con lo stesso indice si
- * coprono a vicenda rendendo irraggiungibili "Update SD (partitions)" e "Boot from NFS".
+/* 7 e 8, non 5 e 6: quelle le usa BOOTMENU, e due voci con lo stesso indice si coprono.
+ * Rinumerate queste e non le altre perche' il bootmenu si ferma al primo indice mancante.
  *
- * Qui dentro c'e' anche swupdate_update_modes, che con le voci di menu non c'entra. Il
- * motivo e' l'ordine: CONFIG_EXTRA_ENV_SETTINGS di hailo1x_common.h finisce con
- *   ... SWUPDATE_EXTRA_ENV_SETTINGS SWUPDATE_BOOTMENU_OPTION
- * e il valore di Hailo (init-partitions-single,init-scu-bl,copy-a) sta dentro il primo.
- * Nell'ambiente di U-Boot, a parita' di chiave vince l'ultima assegnazione, quindi una
- * nostra riga messa insieme alle altre verrebbe sovrascritta: lo abbiamo verificato
- * sull'u-boot-initial-env prodotto, dove comparivano entrambe e vinceva la loro.
- * SWUPDATE_BOOTMENU_OPTION e' l'ultima macro espansa, ed e' nostra: e' l'unico punto da
- * cui possiamo avere l'ultima parola senza duplicare mezzo header di Hailo.
- *
- * Perche' copy-a: init-partitions-single rifa' la tabella delle partizioni e
- * init-scu-bl riscrive il bootloader dello SCU. Giusto per una prima installazione,
- * sbagliato per un aggiornamento sul campo, dove trasforma un update interrotto in una
- * scheda che non riparte. Per la prima installazione si passa il valore completo. */
+ * Qui dentro c'e' anche swupdate_update_modes, che con il menu non c'entra: a parita' di
+ * chiave in U-Boot vince l'ultima assegnazione, e questa e' l'ultima macro espansa di
+ * CONFIG_EXTRA_ENV_SETTINGS. Altrove verrebbe sovrascritta dal valore di Hailo.
+ * copy-a perche' init-partitions-single rifa' le partizioni e init-scu-bl riscrive il
+ * bootloader: giusto in fabbrica, sbagliato per un aggiornamento sul campo. */
 #define SWUPDATE_BOOTMENU_OPTION "bootmenu_7=SWUpdate=run boot_swupdate_mmc\0" \
                                  "bootmenu_8=SWUpdate AB board init=run boot_swupdate_ab_tftp\0" \
                                  "swupdate_update_modes=copy-a\0"

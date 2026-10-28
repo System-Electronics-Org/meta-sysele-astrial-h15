@@ -7,13 +7,9 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 do_install:append() {
     echo "astrialh15" > ${D}${sysconfdir}/hostname
 
-    # /boot nel fstab. La riga la aggiunge wic, quindi il rootfs grezzo dello SWU ne
-    # resta senza e dopo un aggiornamento /boot e' vuoto: la partizione e il fitImage
-    # ci sono, ma non sono montati.
-    #
-    # wic usa l'UUID della partizione, generato a ogni build e quindi non scrivibile
-    # qui. L'etichetta la mette il nostro wks (--label boot) ed e' stabile. nofail
-    # perche' un /boot non montabile non deve impedire l'avvio.
+    # /boot nel fstab: la riga la mette wic, quindi il rootfs grezzo dello .swu ne resta
+    # senza e dopo un aggiornamento /boot non e' montato. Per etichetta perche' l'UUID lo
+    # genera wic. nofail: un /boot non montabile non deve impedire l'avvio.
     echo "LABEL=boot           /boot                vfat       defaults,nofail       0  0" \
         >> ${D}${sysconfdir}/fstab
 }
