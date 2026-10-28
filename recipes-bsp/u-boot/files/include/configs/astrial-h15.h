@@ -13,7 +13,7 @@
 #define BOOTMENU \
     /* Try all boot options by order */ \
     "bootmenu_0=Autodetect=" \
-        /* boot_image_mode = 1 significa aggiornamento remoto richiesto dallo SCU.
+        /* boot_image_mode = 1 significa aggiornamento remoto richiesto dallo SCU. \
          * Senza questo la scheda riparte in Linux e l'OTA non si avvia. */ \
         "if test ${boot_image_mode} = 1; then run boot_swupdate_mmc; exit 1; fi; " \
         "if test \"${auto_uboot_update_enable}\" = \"yes\"; then run auto_uboot_update; exit 1; fi; " \
