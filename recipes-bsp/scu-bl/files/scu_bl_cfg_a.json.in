@@ -22,6 +22,6 @@
             "boot_image_mode": "normal"
         }
     ],
-    "last_valid_desc_index": 1,
+    "last_valid_desc_index": @LAST_VALID_DESC@,
     "debug_logs_enabled": true
 }
