@@ -1,0 +1,103 @@
+From: System Electronics <info@systemelectronics.it>
+Date: Wed, 29 Oct 2026 00:00:00 +0100
+Subject: [PATCH] Fail an update loudly, and never kill init
+
+A rejected update was reported as successful, because the pipeline's exit
+status was the log filter's and the filter ends with || true. A failed TFTP
+download went the other way and ended the script, which for PID 1 means
+Attempted to kill init. Both now retry where it makes sense and otherwise
+restore the previous image and reboot into it.
+
+Upstream-Status: Inappropriate [configuration]
+
+--- a/rcS.swupdate
++++ b/rcS.swupdate
+@@ -2,6 +2,9 @@
+ 
+ # stop upon error
+ set -e
++# Senza pipefail l'esito di "swupdate | filtro" e' quello del filtro, che finisce con
++# "|| true": un aggiornamento rifiutato risulterebbe riuscito.
++set -o pipefail
+ 
+ PATH=/sbin:/bin:/usr/sbin:/usr/bin
+ 
+@@ -22,6 +25,20 @@
+     fi
+ }
+ 
++# Uscire da questo script fa morire init ("Attempted to kill init"): qualunque guasto
++# deve finire con un riavvio nel sistema di prima. Azzerare boot_image_mode e' la parte
++# che conta, altrimenti la scheda rientra in swupdate-image a ogni avvio.
++function abort_to_previous_image() {
++    echo ""
++    echo "*******************************************"
++    echo "SWUpdate FAILED: $1"
++    echo "Restoring the previous image and rebooting"
++    echo "*******************************************"
++    post_swupdate_modify_scu_bl_cfg_bin || echo "could not restore boot_image_mode"
++    sleep 3
++    reboot -f
++}
++
+ # Default grep pattern for filtering swupdate TRACE output.
+ # Keeps INFO/WARN/ERROR and operationally significant TRACE lines:
+ #   - image-to-device mapping (_parse_images, install_single_image)
+@@ -42,10 +59,24 @@
+     fi
+ }
+ 
++# La barra di progresso di busybox scrive una riga al secondo e riempie il log: si
++# tiene solo l'ultima. Un errore vero arriva comunque dall'esito di tftp.
++function download_update() {
++    local attempt
++    for attempt in 1 2 3; do
++        echo "Downloading ${SWUPDATE_UPDATE_FILENAME} from ${SWUPDATE_SERVER_IP} via TFTP (attempt ${attempt})..."
++        if tftp -g -r "${SWUPDATE_UPDATE_FILENAME}" "${SWUPDATE_SERVER_IP}" 2>&1 | tr '\r' '\n' | tail -n 1; then
++            return 0
++        fi
++        echo "Download attempt ${attempt} failed"
++        sleep 5
++    done
++    return 1
++}
++
+ function run_swupdate() {
+     cd /tmp
+-    echo "Downloading ${SWUPDATE_UPDATE_FILENAME} from ${SWUPDATE_SERVER_IP} via TFTP..."
+-    tftp -g -r "${SWUPDATE_UPDATE_FILENAME}" "${SWUPDATE_SERVER_IP}"
++    download_update || abort_to_previous_image "could not download ${SWUPDATE_UPDATE_FILENAME} from ${SWUPDATE_SERVER_IP}"
+ 
+     for update_mode in ${SWUPDATE_UPDATE_MODES//,/ }
+     do
+@@ -54,7 +85,9 @@
+         echo "Running: swupdate with mode ${update_mode}"
+         echo
+         echo "*******************************************"
+-        swupdate -i "${SWUPDATE_UPDATE_FILENAME}" -l "${SWUPDATE_LOGLEVEL:-4}" -m -M -e "stable,${update_mode}" 2>&1 | swupdate_log_filter
++        if ! swupdate -i "${SWUPDATE_UPDATE_FILENAME}" -l "${SWUPDATE_LOGLEVEL:-4}" -m -M -e "stable,${update_mode}" 2>&1 | swupdate_log_filter; then
++            abort_to_previous_image "swupdate refused the update in mode ${update_mode}"
++        fi
+     done
+ 
+     # updates scu_bl_cfg file
+@@ -131,7 +164,9 @@
+     sleep 10
+ 
+     # The goal is to dump SW update output to both stdout and to remote 'nc' listener.
+-    run_swupdate |& tee /proc/self/fd/2 | nc -u "${SWUPDATE_SERVER_IP}" "${SWUPDATE_SERVER_UDP_LOGGING_PORT}"
++    # Con pipefail un "nc" senza ascoltatore farebbe fallire la pipeline e morire init:
++    # i guasti veri li gestisce run_swupdate, che riavvia da se'.
++    run_swupdate |& tee /proc/self/fd/2 | nc -u "${SWUPDATE_SERVER_IP}" "${SWUPDATE_SERVER_UDP_LOGGING_PORT}" || true
+ 
+     return 0
+ }
+@@ -140,4 +175,8 @@
+ 
+ main
+ 
++# Arrivare qui vuol dire che l'aggiornamento non ha riavviato. Uscire farebbe morire
++# init, quindi si torna al sistema di prima.
++abort_to_previous_image "the update ended without rebooting"
++
+ exit 0
