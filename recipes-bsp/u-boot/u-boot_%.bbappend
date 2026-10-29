@@ -31,3 +31,22 @@ do_configure:prepend() {
     # Copy defconfig
     cp ${WORKDIR}/configs/astrial-h15_defconfig ${S}/configs/
 }
+
+# Secondi che il kernel aspetta che lo user space apra /dev/watchdog, sul solo avvio da eMMC.
+SYSELE_WATCHDOG_OPEN_TIMEOUT ?= "60"
+
+do_configure:append() {
+    # Solo con il ripiego A/B acceso: uno slot il cui user space non parte deve finire
+    # in un reset del watchdog, che il SCU bootloader conta. Il parametro va in
+    # bootargs_mmc e basta: bootargs_rw e bootargs_base li usa anche swupdate-image,
+    # che scarica per minuti senza aprire il watchdog e verrebbe resettato a meta'.
+    if [ "${SYSELE_SCU_AB}" = "1" ] && \
+       ! grep -q 'watchdog.open_timeout' ${S}/include/configs/hailo1x_common.h; then
+        sed -i 's|\(root=/dev/mmcblk${device_num}p${mmc_rootfs_partition}\)|\1 watchdog.open_timeout=${SYSELE_WATCHDOG_OPEN_TIMEOUT}|' \
+            ${S}/include/configs/hailo1x_common.h
+        grep -q 'watchdog.open_timeout' ${S}/include/configs/hailo1x_common.h || \
+            bbfatal "u-boot: bootargs_mmc non trovato, watchdog.open_timeout non applicato"
+    fi
+}
+
+do_configure[vardeps] += "SYSELE_SCU_AB SYSELE_WATCHDOG_OPEN_TIMEOUT"

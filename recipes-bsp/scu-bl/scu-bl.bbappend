@@ -13,9 +13,8 @@
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-SYSELE_SCU_FALLBACK_OFFSET ?= "0x00000000"
-SYSELE_SCU_BOOT_RETRIES ?= "0xFF"
-SYSELE_SCU_LAST_VALID_DESC ?= "0"
+# I valori di difetto stanno in conf/machine/astrial-h15.conf, cosi' li vede
+# anche l'immagine e l'interruttore resta uno solo.
 
 SRC_URI:append:astrial-h15 = " file://scu_bl_cfg_a.json.in file://scu_bl_cfg_b.json.in"
 
