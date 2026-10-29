@@ -568,6 +568,14 @@ jobs:
             - `u-boot-initial-env`: U-Boot initial environment
             - `customer_certificate.bin`: Customer certificate
             - `u-boot-tfa.itb`: U-Boot TFA
+            - `scu_bl_cfg_b.bin`, `scu_bl_cfg_a_remote_update.bin`: the other SCU bootloader configurations
+            - `*-build.spdx.json`, `*-deployed.spdx.json`: software bill of materials, SPDX 2.2
+            - `cve-summary.json`, `cve-summary`: the CVE report for the recipes in the image
+
+            The two SBOMs describe different things. **Build** lists every package bitbake built,
+            **Deployed** only what the image ships, which is the one to hand to someone asking what
+            runs on the board. The same files are also attached to the build as the smaller
+            `astrial-h15-sbom` artifact, for anyone who does not want the whole archive.
 
             **Prerequisite, not included in the archive:** flashing the SPI needs Hailo's
             `hailo15_board_tools` Python package, version **${{ env.BOARD_TOOLS_VERSION }}**.
