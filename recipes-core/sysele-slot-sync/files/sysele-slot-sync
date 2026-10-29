@@ -1,0 +1,63 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          sysele-slot-sync
+# Required-Start:    $local_fs
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:
+# Short-Description: keep the SCU bootloader configuration in step with the slot that booted
+### END INIT INFO
+
+# Keeps the SCU bootloader configuration in the SPI-NOR equal to the one this image ships for the
+# slot that booted. The two differ after a fallback, and after an update made by an image carrying
+# another list. Also mounts the /boot of the slot that booted, which LABEL=boot cannot do in A/B
+# because the two boot partitions share a GPT name and carry no filesystem label.
+#
+# Rewriting the list is not enough on its own. The SCU remembers the descriptor index across warm
+# resets, so a reordered list read at the old index sends the board back to the slot it just left.
+# Writing 99 to boot_success_ap_software is the swupdate completed indication, which resets the
+# index, so the next boot reads the new list from its first descriptor. The two writes belong
+# together: the list alone leaves a warm reboot on the broken slot, the 99 alone sends every boot
+# back to a slot that is still first in the list.
+
+GET=/etc/get_sw_image.sh
+SET=/etc/set_sw_image.sh
+DEV=$(/etc/get_boot_dev.sh --firmware 2>/dev/null)
+
+cfg_matches() {
+    want="$1"
+    size=$(stat -c %s "$want")
+    for blk in 5 6; do
+        have=$(dd if="/dev/$DEV" bs=4096 skip=$blk count=1 2>/dev/null | head -c "$size" | md5sum | cut -d' ' -f1)
+        [ "$have" = "$(md5sum < "$want" | cut -d' ' -f1)" ] || return 1
+    done
+    return 0
+}
+
+mount_boot() {
+    grep -q ' /boot ' /proc/mounts && return 0
+    root=$(sed -n 's/.*root=\([^ ]*\).*/\1/p' /proc/cmdline)
+    case "$root" in /dev/mmcblk[0-9]p[0-9]*) ;; *) return 0 ;; esac
+    mount "${root%p*}p$((${root##*p} - 1))" /boot 2>/dev/null
+}
+
+case "$1" in
+    start)
+        mount_boot
+        [ -n "$DEV" ] || exit 0
+        booted=$("$GET" --boot) || exit 0
+        case "$booted" in a|b) ;; *) exit 0 ;; esac
+        want="/etc/scu_bl_cfg/scu_bl_cfg_$booted.bin"
+        [ -r "$want" ] || exit 0
+        cfg_matches "$want" && exit 0
+        echo "sysele-slot-sync: writing the SCU bootloader configuration of slot $booted"
+        if "$SET" "$booted"; then
+            echo 99 > /sys/devices/soc0/boot_info/boot_success_ap_software
+        else
+            echo "sysele-slot-sync: could not update the SCU bootloader configuration" >&2
+        fi
+        ;;
+    stop|restart|reload|force-reload) ;;
+    *) echo "Usage: $0 start" >&2; exit 1 ;;
+esac
+exit 0
