@@ -480,14 +480,24 @@ jobs:
         if: inputs.release != 'none'
         run: |
           cd release-files
-          # Copy scripts to root level preserving executable permissions
+          # upload-artifact conserva i percorsi quando le radici sono diverse, quindi
+          # qui dentro i file arrivano annidati sotto meta-hailo-soc/ e meta-sysele-bsp/.
+          # Le note di release li elencano per nome: l'archivio va appiattito, o chi lo
+          # apre trova un albero di sette livelli invece dei file.
           if [ -d "meta-sysele-bsp/scripts" ]; then
             cp -p meta-sysele-bsp/scripts/* .
-            # Ensure execute permissions on all script files
-            chmod +x *.sh *.py hailo15_* uart_* 2>/dev/null || true
           fi
-          # Ensure execute permissions on any scripts in root
+          cp -p meta-hailo-soc/build/tmp/deploy/images/astrial-h15/* . 2>/dev/null || true
+          cp -rp meta-hailo-soc/build/tmp/log/cve/* . 2>/dev/null || true
+          rm -rf meta-hailo-soc meta-sysele-bsp
           chmod +x *.sh *.py hailo15_* uart_* 2>/dev/null || true
+
+          # Se l'appiattimento perde qualcosa, meglio fermarsi che pubblicare un archivio
+          # monco: questi file sono quelli che le note promettono.
+          for f in core-image-hailo-dev-astrial-h15.wic hailo-update-image-astrial-h15.swu \
+                   u-boot-tfa.itb scu_bl_cfg_a.bin program_spi_flash.sh; do
+            [ -e "$f" ] || { echo "ERROR: $f non e' nell'archivio dopo l'appiattimento" >&2; exit 1; }
+          done
           # Nome stabile per la continuous, cosi' l'asset viene sostituito invece di
           # accumularsi sulla stessa release. Per una release vera, il nome porta il tag.
           if [ "${{ inputs.release }}" = "tagged" ]; then
