@@ -15,15 +15,29 @@
 # - Built Yocto image artifacts available
 # - Root privileges (sudo) for serial port access
 #
-# Usage: ./program_spi_flash.sh [serial_device]
+# Usage: ./program_spi_flash.sh [serial_device] [--with-b-slot]
 # Example: ./program_spi_flash.sh /dev/ttyUSB0
+#          ./program_spi_flash.sh /dev/ttyUSB0 --with-b-slot
+#
+# --with-b-slot also writes the second copy of the firmware, which the SCU
+# bootloader falls back to when the first one does not start. Only useful with a
+# layer built with SYSELE_SCU_FALLBACK_OFFSET set: without that, the descriptor
+# list names one slot and the second copy is never read. Doubles the time.
 
 set -e
 
 echo "WARNING: This script requires root permissions for serial port access."
 
-# Default serial device
-SERIAL_DEVICE=${1:-/dev/ttyUSB0}
+# Default serial device, and the B slot off unless asked for
+SERIAL_DEVICE=/dev/ttyUSB0
+WITH_B_SLOT=0
+for arg in "$@"; do
+    case "$arg" in
+        --with-b-slot) WITH_B_SLOT=1 ;;
+        -*) echo "Unknown option: $arg" >&2; exit 1 ;;
+        *) SERIAL_DEVICE="$arg" ;;
+    esac
+done
 
 # Version of hailo15_board_tools that matches the Hailo stack this layer builds
 # against. Tracks the meta-hailo refspec in kas/astrial-h15-vpu-base.yml, so it
@@ -115,10 +129,31 @@ if [ ! -e "$SERIAL_DEVICE" ]; then
     exit 1
 fi
 
-echo "Starting UART boot firmware loader, requiring sudo permissions..."
-sudo $(which python3) ./uart_boot_fw_loader \
-    --serial-device-name "$SERIAL_DEVICE" \
-    --firmware "$BUILD_DIR/hailo15_uart_recovery_fw.bin"
+load_recovery_firmware() {
+    echo "Starting UART boot firmware loader, requiring sudo permissions..."
+    sudo "$PYTHON_BIN" ./uart_boot_fw_loader \
+        --serial-device-name "$SERIAL_DEVICE" \
+        --firmware "$BUILD_DIR/hailo15_uart_recovery_fw.bin"
+}
+
+# $@ are extra options: --b-image writes the second copy, every section from
+# 0x8000 up shifted by 0x78000, which is the offset the B descriptor names.
+program_flash() {
+    sudo "$PYTHON_BIN" ./hailo15_spi_flash_program \
+        --scu-bootloader "$BUILD_DIR/hailo15_scu_bl.bin" \
+        --scu-bootloader-config "$BUILD_DIR/scu_bl_cfg_a.bin" \
+        --scu-firmware "$BUILD_DIR/hailo15_scu_fw.bin" \
+        --uboot-device-tree "$BUILD_DIR/u-boot.dtb.signed" \
+        --bootloader "$BUILD_DIR/u-boot-spl.bin" \
+        --bootloader-env "$BUILD_DIR/u-boot-initial-env" \
+        --customer-certificate "$BUILD_DIR/customer_certificate.bin" \
+        --uart-load \
+        --serial-device-name "$SERIAL_DEVICE" \
+        --uboot-tfa "$BUILD_DIR/u-boot-tfa.itb" \
+        "$@"
+}
+
+load_recovery_firmware
 
 if [ $? -ne 0 ]; then
     echo "Error: UART boot firmware loader failed"
@@ -126,19 +161,23 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Programming SPI flash memory, requiring sudo permissions..."
-sudo $(which python3) ./hailo15_spi_flash_program \
-    --scu-bootloader "$BUILD_DIR/hailo15_scu_bl.bin" \
-    --scu-bootloader-config "$BUILD_DIR/scu_bl_cfg_a.bin" \
-    --scu-firmware "$BUILD_DIR/hailo15_scu_fw.bin" \
-    --uboot-device-tree "$BUILD_DIR/u-boot.dtb.signed" \
-    --bootloader "$BUILD_DIR/u-boot-spl.bin" \
-    --bootloader-env "$BUILD_DIR/u-boot-initial-env" \
-    --customer-certificate "$BUILD_DIR/customer_certificate.bin" \
-    --uart-load \
-    --serial-device-name "$SERIAL_DEVICE" \
-    --uboot-tfa "$BUILD_DIR/u-boot-tfa.itb"
+program_flash
 
 if [ $? -eq 0 ]; then
+    if [ "$WITH_B_SLOT" = "1" ]; then
+        echo ""
+        echo "Programming the B slot (second copy, offset +0x78000)..."
+        # Non sappiamo se il firmware di recupero resti servito dopo la prima
+        # programmazione: se la seconda non parte lo si ricarica e si riprova, invece
+        # di far fallire tutto e costringere a rifare il giro da capo.
+        if ! program_flash --b-image; then
+            echo "Retrying after reloading the recovery firmware..."
+            load_recovery_firmware
+            program_flash --b-image
+        fi
+        echo "B slot programmed"
+    fi
+
     echo ""
     echo "========================================"
     echo "SPI Flash Programming Completed Successfully!"
@@ -149,6 +188,12 @@ if [ $? -eq 0 ]; then
     echo "2. Set DIP switches to normal boot mode (1=OFF, 2=OFF)"
     echo "3. Power on the board to verify U-Boot menu appears"
     echo ""
+    if [ "$WITH_B_SLOT" = "1" ]; then
+        echo "The B slot holds a copy of the firmware. The SCU bootloader uses it only"
+        echo "if the descriptor list says so, which needs SYSELE_SCU_FALLBACK_OFFSET set"
+        echo "when the layer is built."
+        echo ""
+    fi
 else
     echo "Error: SPI flash programming failed"
     echo "Please check connections and try again"
